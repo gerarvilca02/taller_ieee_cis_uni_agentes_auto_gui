@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="GUI didáctica para comparar automatización clásica y agentes multimodales.">
+  <title>FlowDesk Lab</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #10233f;
+      --muted: #61728a;
+      --line: #dbe4ef;
+      --surface: #ffffff;
+      --canvas: #f2f6fb;
+      --navy: #102a56;
+      --blue: #246bfd;
+      --cyan: #44d7d1;
+      --lime: #c7f36b;
+      --danger: #c33f55;
+      --shadow: 0 18px 50px rgba(18, 42, 78, .13);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 8% 4%, rgba(68, 215, 209, .18), transparent 28rem),
+        radial-gradient(circle at 94% 92%, rgba(36, 107, 253, .12), transparent 31rem),
+        var(--canvas);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+    }
+
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 3px solid rgba(36, 107, 253, .25);
+      outline-offset: 2px;
+    }
+
+    .app-shell { min-height: 100vh; }
+
+    .topbar {
+      height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 clamp(20px, 4vw, 64px);
+      color: white;
+      background: var(--navy);
+      border-bottom: 4px solid var(--cyan);
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px 4px 12px 4px;
+      background: var(--lime);
+      color: var(--navy);
+      font-weight: 900;
+      letter-spacing: -.08em;
+      transform: rotate(-3deg);
+    }
+    .brand-copy strong { display: block; font-size: 1.02rem; letter-spacing: .01em; }
+    .brand-copy span { color: #b9c7dc; font-size: .79rem; }
+
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .icon-button, .ghost-button {
+      min-height: 42px;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 12px;
+      background: rgba(255,255,255,.08);
+      color: white;
+      padding: 0 14px;
+    }
+    .icon-button { width: 44px; padding: 0; font-size: 1.2rem; }
+
+    .layout {
+      width: min(1180px, calc(100% - 32px));
+      margin: 34px auto 64px;
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 24px;
+    }
+
+    .sidebar, .panel {
+      background: rgba(255,255,255,.94);
+      border: 1px solid rgba(211, 223, 237, .95);
+      box-shadow: var(--shadow);
+    }
+
+    .sidebar {
+      border-radius: 22px;
+      padding: 18px;
+      align-self: start;
+      position: sticky;
+      top: 22px;
+    }
+
+    .workspace-label {
+      margin: 4px 8px 16px;
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .nav-button {
+      width: 100%;
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border: 0;
+      border-radius: 13px;
+      background: transparent;
+      color: var(--ink);
+      padding: 0 13px;
+      text-align: left;
+      font-weight: 680;
+    }
+    .nav-button:hover, .nav-button[aria-expanded="true"] { background: #ecf3ff; color: var(--blue); }
+    .nav-button.active { background: var(--navy); color: white; }
+    .nav-leading { display: flex; align-items: center; gap: 10px; }
+    .nav-icon { width: 24px; text-align: center; }
+
+    .menu-wrap { position: relative; }
+    .menu {
+      position: absolute;
+      z-index: 8;
+      left: calc(100% + 12px);
+      top: 0;
+      width: 230px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: white;
+      box-shadow: var(--shadow);
+    }
+    .menu[hidden] { display: none; }
+    .menu button {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--ink);
+      padding: 11px 12px;
+      text-align: left;
+    }
+    .menu button:hover { background: #eef4ff; }
+
+    .main { min-width: 0; }
+    .page-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 20px;
+      margin: 2px 4px 22px;
+    }
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--blue);
+      font-size: .77rem;
+      font-weight: 850;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.7rem); line-height: 1.05; letter-spacing: -.045em; }
+    .page-heading p:last-child { margin: 9px 0 0; color: var(--muted); }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+      border: 1px solid #cfe0ff;
+      border-radius: 999px;
+      background: #edf4ff;
+      color: #174ca5;
+      padding: 9px 13px;
+      font-size: .82rem;
+      font-weight: 800;
+    }
+    .status-pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--blue); }
+    .status-pill.success { border-color: #bfe9d5; background: #e8fbf1; color: #14764a; }
+    .status-pill.success::before { background: #26a269; }
+
+    .panel { border-radius: 24px; overflow: hidden; }
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 22px 24px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(110deg, #fff, #f6f9ff);
+    }
+    .panel-head h2 { margin: 0; font-size: 1.15rem; }
+    .panel-head p { margin: 6px 0 0; color: var(--muted); font-size: .9rem; }
+
+    .stepper { display: flex; gap: 8px; }
+    .step { width: 34px; height: 7px; border-radius: 99px; background: #d9e3f0; }
+    .step.active { background: var(--blue); }
+    .step.done { background: var(--cyan); }
+
+    .empty-state { padding: 58px 24px 64px; text-align: center; }
+    .empty-symbol {
+      width: 78px;
+      height: 78px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 20px;
+      border-radius: 24px;
+      background: linear-gradient(145deg, #e8efff, #e5fbf8);
+      color: var(--blue);
+      font-size: 2rem;
+      transform: rotate(-4deg);
+    }
+    .empty-state h3 { margin: 0 0 8px; font-size: 1.3rem; }
+    .empty-state p { max-width: 480px; margin: 0 auto; color: var(--muted); line-height: 1.6; }
+
+    form { padding: 26px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .field { display: flex; flex-direction: column; gap: 8px; }
+    .field.full { grid-column: 1 / -1; }
+    label, .field-label { font-weight: 760; font-size: .88rem; }
+    .hint { color: var(--muted); font-size: .78rem; }
+    input[type="text"], input[type="email"], select {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid #cbd7e5;
+      border-radius: 12px;
+      background: white;
+      color: var(--ink);
+      padding: 0 13px;
+    }
+    input:hover, select:hover { border-color: #99afd0; }
+
+    .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
+    .radio-card { flex: 1 1 125px; position: relative; }
+    .radio-card input { position: absolute; opacity: 0; pointer-events: none; }
+    .radio-card label {
+      min-height: 48px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #cbd7e5;
+      border-radius: 12px;
+      background: white;
+      color: var(--muted);
+    }
+    .radio-card input:checked + label { border-color: var(--blue); background: #edf4ff; color: #174ca5; }
+    .radio-card input:focus-visible + label { outline: 3px solid rgba(36, 107, 253, .25); outline-offset: 2px; }
+
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: #f9fbfe;
+    }
+    .switch-row strong { display: block; font-size: .9rem; }
+    .switch-row span { color: var(--muted); font-size: .78rem; }
+    .switch { position: relative; width: 48px; height: 28px; flex: 0 0 auto; }
+    .switch input { position: absolute; opacity: 0; }
+    .switch-track { position: absolute; inset: 0; border-radius: 99px; background: #afbdd0; transition: .2s ease; }
+    .switch-track::after { content: ""; position: absolute; width: 20px; height: 20px; top: 4px; left: 4px; border-radius: 50%; background: white; transition: .2s ease; box-shadow: 0 2px 5px rgba(0,0,0,.2); }
+    .switch input:checked + .switch-track { background: var(--blue); }
+    .switch input:checked + .switch-track::after { transform: translateX(20px); }
+    .switch input:focus-visible + .switch-track { outline: 3px solid rgba(36, 107, 253, .25); outline-offset: 2px; }
+
+    .form-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 26px; }
+    .button {
+      min-height: 46px;
+      border: 0;
+      border-radius: 12px;
+      padding: 0 18px;
+      font-weight: 800;
+    }
+    .button.primary { background: var(--blue); color: white; box-shadow: 0 8px 18px rgba(36,107,253,.24); }
+    .button.primary:hover { background: #135ae4; }
+    .button.secondary { background: #eaf0f7; color: var(--ink); }
+    .button.danger { background: #ffe9ed; color: var(--danger); }
+
+    .result-card { display: none; margin: 24px; border: 1px solid #bae5d0; border-radius: 17px; background: #edfbf4; padding: 20px; }
+    .result-card.visible { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .result-card strong { color: #117046; }
+    .result-card p { margin: 5px 0 0; color: #44715d; }
+
+    .modal-backdrop {
+      position: fixed;
+      z-index: 30;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(9, 24, 47, .58);
+      backdrop-filter: blur(5px);
+    }
+    .modal-backdrop[hidden] { display: none; }
+    .modal {
+      width: min(520px, 100%);
+      border-radius: 22px;
+      background: white;
+      box-shadow: 0 30px 80px rgba(4, 17, 36, .35);
+      overflow: hidden;
+    }
+    .modal-accent { height: 8px; background: linear-gradient(90deg, var(--cyan), var(--blue), var(--lime)); }
+    .modal-body { padding: 24px; }
+    .modal h2 { margin: 0 0 8px; }
+    .modal p { margin: 0; color: var(--muted); line-height: 1.55; }
+    .summary { margin: 20px 0; display: grid; gap: 10px; }
+    .summary-row { display: flex; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+    .summary-row span { color: var(--muted); }
+    .summary-row strong { text-align: right; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+    .toast-region { position: fixed; z-index: 60; right: 22px; bottom: 22px; display: grid; gap: 10px; }
+    .toast {
+      width: min(370px, calc(100vw - 44px));
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      border-radius: 15px;
+      background: #0f294e;
+      color: white;
+      padding: 15px 17px;
+      box-shadow: 0 18px 45px rgba(4, 17, 36, .32);
+      animation: toast-in .25s ease both;
+    }
+    .toast.fade { animation: toast-out .35s ease both; }
+    .toast strong { display: block; margin-bottom: 3px; }
+    .toast span { color: #c8d7e9; font-size: .86rem; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(12px); } }
+    @keyframes toast-out { to { opacity: 0; transform: translateY(10px); } }
+
+    .drawer-backdrop { position: fixed; z-index: 40; inset: 0; background: rgba(9,24,47,.34); }
+    .drawer-backdrop[hidden], .drawer[hidden] { display: none; }
+    .drawer {
+      position: fixed;
+      z-index: 45;
+      top: 0;
+      right: 0;
+      width: min(430px, 92vw);
+      height: 100vh;
+      background: white;
+      box-shadow: -20px 0 70px rgba(9,24,47,.24);
+      padding: 24px;
+      overflow: auto;
+    }
+    .drawer-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+    .drawer h2 { margin: 0; }
+    .close-button { width: 40px; height: 40px; border: 0; border-radius: 10px; background: #edf2f8; color: var(--ink); font-size: 1.2rem; }
+    .activity-list { display: grid; gap: 12px; margin-top: 20px; }
+    .activity-item { border: 1px solid var(--line); border-radius: 15px; padding: 15px; background: #fbfcfe; }
+    .activity-item .row { display: flex; justify-content: space-between; gap: 12px; }
+    .activity-item p { margin: 7px 0 0; color: var(--muted); font-size: .86rem; }
+    .sent-badge { border-radius: 999px; background: #e4f8ed; color: #137647; padding: 5px 9px; font-size: .76rem; font-weight: 850; }
+    .muted-activity { color: var(--muted); text-align: center; padding: 42px 10px; }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 780px) {
+      .topbar { padding: 0 18px; }
+      .brand-copy span, .ghost-button span { display: none; }
+      .layout { grid-template-columns: 1fr; margin-top: 20px; }
+      .sidebar { position: static; display: flex; gap: 8px; overflow-x: auto; padding: 10px; border-radius: 16px; }
+      .workspace-label { display: none; }
+      .nav-button { width: auto; min-width: max-content; }
+      .menu { left: 0; top: calc(100% + 8px); }
+      .form-grid { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .page-heading { align-items: start; flex-direction: column; }
+      .panel-head { align-items: flex-start; flex-direction: column; }
+      .result-card.visible { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body data-task-status="pending" data-workflow-state="idle">
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand" aria-label="FlowDesk Lab">
+        <div class="brand-mark" aria-hidden="true">F</div>
+        <div class="brand-copy"><strong>FlowDesk Lab</strong><span>Entorno de automatización</span></div>
+      </div>
+      <div class="header-actions">
+        <button class="ghost-button" id="resetButton" type="button"><span>Restablecer demo</span><span aria-hidden="true"> ↻</span></button>
+        <button class="icon-button" id="activityButton" type="button" aria-label="Abrir centro de actividad" aria-haspopup="dialog">☰</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar" aria-label="Navegación principal">
+        <p class="workspace-label">Espacio de trabajo</p>
+        <button class="nav-button active" type="button" aria-current="page"><span class="nav-leading"><span class="nav-icon" aria-hidden="true">⌂</span>Inicio</span></button>
+        <div class="menu-wrap">
+          <button class="nav-button" id="operationsButton" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="operationsMenu"><span class="nav-leading"><span class="nav-icon" aria-hidden="true">◆</span>Operaciones</span><span aria-hidden="true">›</span></button>
+          <div class="menu" id="operationsMenu" role="menu" aria-label="Operaciones" hidden>
+            <button id="newRequestButton" type="button" role="menuitem">Nueva solicitud</button>
+            <button type="button" role="menuitem">Consultar solicitudes</button>
+            <button type="button" role="menuitem">Exportar actividad</button>
+          </div>
+        </div>
+        <button class="nav-button" type="button"><span class="nav-leading"><span class="nav-icon" aria-hidden="true">◎</span>Reportes</span></button>
+        <button class="nav-button" type="button"><span class="nav-leading"><span class="nav-icon" aria-hidden="true">⚙</span>Configuración</span></button>
+      </aside>
+
+      <main class="main">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Laboratorio GUI</p>
+            <h1>Gestión de solicitudes</h1>
+            <p>Completa el flujo operativo y verifica el resultado en actividad.</p>
+          </div>
+          <div class="status-pill" id="objectiveStatus" role="status">Objetivo pendiente</div>
+        </div>
+
+        <section class="panel" aria-labelledby="panelTitle">
+          <div class="panel-head">
+            <div>
+              <h2 id="panelTitle">Panel de operaciones</h2>
+              <p id="panelDescription">Selecciona una acción desde el menú Operaciones.</p>
+            </div>
+            <div class="stepper" aria-label="Progreso del flujo">
+              <span class="step active" id="step1"></span>
+              <span class="step" id="step2"></span>
+              <span class="step" id="step3"></span>
+            </div>
+          </div>
+
+          <div class="empty-state" id="emptyState">
+            <div class="empty-symbol" aria-hidden="true">◇</div>
+            <h3>No hay una operación activa</h3>
+            <p>Abre el menú Operaciones y crea una nueva solicitud para comenzar.</p>
+          </div>
+
+          <form id="requestForm" aria-label="Formulario de nueva solicitud" hidden>
+            <div class="form-grid">
+              <div class="field">
+                <label for="fullName">Nombre completo</label>
+                <input id="fullName" name="fullName" type="text" autocomplete="off" required placeholder="Ej. Ana Torres">
+              </div>
+              <div class="field">
+                <label for="email">Correo corporativo</label>
+                <input id="email" name="email" type="email" autocomplete="off" required placeholder="nombre@empresa.com">
+              </div>
+              <div class="field full">
+                <label for="requestType">Tipo de solicitud</label>
+                <select id="requestType" name="requestType" required>
+                  <option value="">Selecciona una opción</option>
+                  <option value="Acceso temporal">Acceso temporal</option>
+                  <option value="Acceso permanente">Acceso permanente</option>
+                  <option value="Cambio de permisos">Cambio de permisos</option>
+                </select>
+              </div>
+              <fieldset class="field full" style="border:0;padding:0;margin:0">
+                <legend class="field-label">Prioridad</legend>
+                <div class="radio-group" role="radiogroup" aria-label="Prioridad">
+                  <div class="radio-card"><input id="priorityLow" type="radio" name="priority" value="Baja"><label for="priorityLow">Baja</label></div>
+                  <div class="radio-card"><input id="priorityMedium" type="radio" name="priority" value="Media" checked><label for="priorityMedium">Media</label></div>
+                  <div class="radio-card"><input id="priorityHigh" type="radio" name="priority" value="Alta"><label for="priorityHigh">Alta</label></div>
+                </div>
+              </fieldset>
+              <div class="field full">
+                <div class="switch-row">
+                  <div><strong>Notificaciones por correo</strong><span>Recibe una confirmación al completar la solicitud.</span></div>
+                  <label class="switch"><input id="notifications" type="checkbox" role="switch" aria-label="Notificaciones por correo"><span class="switch-track" aria-hidden="true"></span></label>
+                </div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="button danger" id="cancelButton" type="button">Cancelar</button>
+              <button class="button primary" type="submit">Continuar</button>
+            </div>
+          </form>
+
+          <div class="result-card" id="resultCard" role="status">
+            <div><strong>Solicitud enviada correctamente</strong><p>El registro SOL-1043 ya está disponible en el centro de actividad.</p></div>
+            <button class="button secondary" id="viewActivityButton" type="button">Ver actividad</button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="confirmBackdrop" hidden>
+    <section class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmDescription">
+      <div class="modal-accent"></div>
+      <div class="modal-body">
+        <h2 id="confirmTitle">Confirmar solicitud</h2>
+        <p id="confirmDescription">Revisa los datos antes de registrar la operación.</p>
+        <div class="summary" id="requestSummary"></div>
+        <div class="modal-actions">
+          <button class="button secondary" id="backButton" type="button">Volver</button>
+          <button class="button primary" id="confirmButton" type="button">Confirmar y enviar</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <aside class="drawer" id="activityDrawer" role="dialog" aria-modal="true" aria-labelledby="activityTitle" hidden>
+    <div class="drawer-head">
+      <div><p class="eyebrow">Seguimiento</p><h2 id="activityTitle">Centro de actividad</h2></div>
+      <button class="close-button" id="closeDrawerButton" type="button" aria-label="Cerrar centro de actividad">×</button>
+    </div>
+    <div class="activity-list" id="activityList"><p class="muted-activity">Aún no hay actividad reciente.</p></div>
+  </aside>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+    const body = document.body
+    const operationsButton = document.getElementById('operationsButton')
+    const operationsMenu = document.getElementById('operationsMenu')
+    const newRequestButton = document.getElementById('newRequestButton')
+    const emptyState = document.getElementById('emptyState')
+    const requestForm = document.getElementById('requestForm')
+    const resultCard = document.getElementById('resultCard')
+    const confirmBackdrop = document.getElementById('confirmBackdrop')
+    const requestSummary = document.getElementById('requestSummary')
+    const activityDrawer = document.getElementById('activityDrawer')
+    const drawerBackdrop = document.getElementById('drawerBackdrop')
+    const activityList = document.getElementById('activityList')
+    const objectiveStatus = document.getElementById('objectiveStatus')
+    const panelDescription = document.getElementById('panelDescription')
+    let submittedData = null
+    window.flowDeskState = { submittedData: null }
+
+    const escapeHtml = value => String(value).replace(/[&<>'"]/g, character => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    })[character])
+
+    const closeMenu = () => {
+      operationsMenu.hidden = true
+      operationsButton.setAttribute('aria-expanded', 'false')
+    }
+
+    const setSteps = state => {
+      const steps = [document.getElementById('step1'), document.getElementById('step2'), document.getElementById('step3')]
+      steps.forEach(step => step.className = 'step')
+      if (state === 'idle') steps[0].classList.add('active')
+      if (state === 'form') { steps[0].classList.add('done'); steps[1].classList.add('active') }
+      if (state === 'submitted') { steps[0].classList.add('done'); steps[1].classList.add('done'); steps[2].classList.add('active') }
+      if (state === 'completed') steps.forEach(step => step.classList.add('done'))
+    }
+
+    const showToast = (title, message) => {
+      const toast = document.createElement('div')
+      toast.className = 'toast'
+      toast.setAttribute('role', 'status')
+      toast.innerHTML = `<div aria-hidden="true">✓</div><div><strong>${title}</strong><span>${message}</span></div>`
+      document.getElementById('toastRegion').appendChild(toast)
+      setTimeout(() => toast.classList.add('fade'), 3200)
+      setTimeout(() => toast.remove(), 3600)
+    }
+
+    const openActivity = () => {
+      activityDrawer.hidden = false
+      drawerBackdrop.hidden = false
+      if (submittedData) {
+        const notificationText = submittedData.notifications ? 'Notificaciones activadas' : 'Notificaciones desactivadas'
+        activityList.innerHTML = `<article class="activity-item" role="article" aria-label="Solicitud SOL-1043" data-record-id="SOL-1043" data-name="${escapeHtml(submittedData.name)}" data-email="${escapeHtml(submittedData.email)}" data-request-type="${escapeHtml(submittedData.type)}" data-priority="${escapeHtml(submittedData.priority)}" data-notifications="${submittedData.notifications}"><div class="row"><strong>SOL-1043 · ${escapeHtml(submittedData.type)}</strong><span class="sent-badge">Enviada</span></div><p>${escapeHtml(submittedData.name)} · ${escapeHtml(submittedData.email)} · Prioridad ${escapeHtml(submittedData.priority)} · ${notificationText}</p></article>`
+        body.dataset.taskStatus = 'completed'
+        objectiveStatus.textContent = 'Objetivo completado'
+        objectiveStatus.classList.add('success')
+        setSteps('completed')
+      }
+      document.getElementById('closeDrawerButton').focus()
+    }
+
+    const closeActivity = () => {
+      activityDrawer.hidden = true
+      drawerBackdrop.hidden = true
+      document.getElementById('activityButton').focus()
+    }
+
+    operationsButton.addEventListener('click', () => {
+      const shouldOpen = operationsMenu.hidden
+      operationsMenu.hidden = !shouldOpen
+      operationsButton.setAttribute('aria-expanded', String(shouldOpen))
+      if (shouldOpen) newRequestButton.focus()
+    })
+
+    newRequestButton.addEventListener('click', () => {
+      closeMenu()
+      emptyState.hidden = true
+      resultCard.classList.remove('visible')
+      requestForm.hidden = false
+      body.dataset.workflowState = 'form'
+      panelDescription.textContent = 'Ingresa la información requerida para continuar.'
+      setSteps('form')
+      document.getElementById('fullName').focus()
+    })
+
+    requestForm.addEventListener('submit', event => {
+      event.preventDefault()
+      if (!requestForm.reportValidity()) return
+      const data = new FormData(requestForm)
+      const notifications = document.getElementById('notifications').checked ? 'Activadas' : 'Desactivadas'
+      requestSummary.innerHTML = [
+        ['Solicitante', data.get('fullName')],
+        ['Correo', data.get('email')],
+        ['Tipo', data.get('requestType')],
+        ['Prioridad', data.get('priority')],
+        ['Notificaciones', notifications]
+      ].map(([label, value]) => `<div class="summary-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')
+      confirmBackdrop.hidden = false
+      document.getElementById('confirmButton').focus()
+    })
+
+    document.getElementById('backButton').addEventListener('click', () => {
+      confirmBackdrop.hidden = true
+      document.querySelector('#requestForm button[type="submit"]').focus()
+    })
+
+    document.getElementById('confirmButton').addEventListener('click', () => {
+      const data = new FormData(requestForm)
+      submittedData = {
+        name: data.get('fullName'),
+        email: data.get('email'),
+        type: data.get('requestType'),
+        priority: data.get('priority'),
+        notifications: document.getElementById('notifications').checked
+      }
+      window.flowDeskState.submittedData = { ...submittedData }
+      confirmBackdrop.hidden = true
+      requestForm.hidden = true
+      resultCard.classList.add('visible')
+      body.dataset.workflowState = 'submitted'
+      panelDescription.textContent = 'Solicitud registrada. Comprueba su estado en el centro de actividad.'
+      setSteps('submitted')
+      showToast('Operación completada', 'La solicitud SOL-1043 fue registrada correctamente.')
+    })
+
+    document.getElementById('cancelButton').addEventListener('click', () => window.location.reload())
+    document.getElementById('resetButton').addEventListener('click', () => window.location.reload())
+    document.getElementById('activityButton').addEventListener('click', openActivity)
+    document.getElementById('viewActivityButton').addEventListener('click', openActivity)
+    document.getElementById('closeDrawerButton').addEventListener('click', closeActivity)
+    drawerBackdrop.addEventListener('click', closeActivity)
+
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return
+      if (!confirmBackdrop.hidden) confirmBackdrop.hidden = true
+      else if (!activityDrawer.hidden) closeActivity()
+      else closeMenu()
+    })
+
+    document.addEventListener('click', event => {
+      if (!event.target.closest('.menu-wrap')) closeMenu()
+    })
+
+    setSteps('idle')
+  </script>
+</body>
+</html>

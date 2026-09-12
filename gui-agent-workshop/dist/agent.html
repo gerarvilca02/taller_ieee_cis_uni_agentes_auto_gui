@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Consola de supervisión para un agente de automatización GUI.">
+  <title>FlowDesk Agent Console</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #10233f;
+      --muted: #66758a;
+      --line: #dce5ef;
+      --surface: #ffffff;
+      --canvas: #edf3f9;
+      --navy: #102a56;
+      --blue: #246bfd;
+      --cyan: #44d7d1;
+      --lime: #c7f36b;
+      --success: #158056;
+      --danger: #bf3e56;
+      --shadow: 0 18px 55px rgba(16, 42, 86, .13);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 8% 2%, rgba(68, 215, 209, .22), transparent 30rem),
+        radial-gradient(circle at 100% 100%, rgba(36, 107, 253, .16), transparent 34rem),
+        var(--canvas);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, textarea, select, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible {
+      outline: 3px solid rgba(36, 107, 253, .24);
+      outline-offset: 2px;
+    }
+
+    .topbar {
+      min-height: 74px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 14px clamp(18px, 4vw, 54px);
+      color: white;
+      background: var(--navy);
+      border-bottom: 4px solid var(--cyan);
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px 5px 13px 5px;
+      background: var(--lime);
+      color: var(--navy);
+      font-weight: 950;
+      transform: rotate(-3deg);
+    }
+    .brand strong, .brand span { display: block; }
+    .brand span { margin-top: 2px; color: #b9c7dc; font-size: .78rem; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .top-link, .new-session {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: 11px;
+      background: rgba(255,255,255,.08);
+      color: white;
+      padding: 0 13px;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .workspace {
+      width: min(1440px, calc(100% - 30px));
+      min-height: calc(100vh - 108px);
+      margin: 22px auto 30px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 390px;
+      gap: 20px;
+    }
+
+    .panel {
+      overflow: hidden;
+      border: 1px solid rgba(211, 223, 237, .95);
+      border-radius: 22px;
+      background: rgba(255,255,255,.96);
+      box-shadow: var(--shadow);
+    }
+
+    .chat-panel { min-height: 720px; display: flex; flex-direction: column; }
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 21px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(110deg, #fff, #f4f8ff);
+    }
+    .panel-head h1, .panel-head h2 { margin: 0; font-size: 1.08rem; }
+    .panel-head p { margin: 5px 0 0; color: var(--muted); font-size: .82rem; }
+    .status {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border-radius: 999px;
+      background: #eef3f8;
+      color: #596a80;
+      padding: 7px 11px;
+      font-size: .76rem;
+      font-weight: 850;
+    }
+    .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #95a3b4; }
+    .status.running { background: #eaf2ff; color: #1952ae; }
+    .status.running::before { background: var(--blue); animation: pulse 1.2s infinite; }
+    .status.completed { background: #e8f9f0; color: var(--success); }
+    .status.completed::before { background: var(--success); }
+    .status.error { background: #fff0f2; color: var(--danger); }
+    .status.error::before { background: var(--danger); }
+    @keyframes pulse { 50% { opacity: .35; transform: scale(.72); } }
+
+    .messages {
+      flex: 1;
+      min-height: 390px;
+      max-height: calc(100vh - 350px);
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: linear-gradient(180deg, #fbfdff 0, #f7faff 100%);
+    }
+    .empty-chat { margin: auto; max-width: 520px; text-align: center; color: var(--muted); line-height: 1.55; }
+    .empty-chat .symbol { width: 64px; height: 64px; display: grid; place-items: center; margin: 0 auto 15px; border-radius: 20px; background: #eaf1ff; color: var(--blue); font-size: 1.7rem; }
+    .empty-chat strong { display: block; margin-bottom: 6px; color: var(--ink); font-size: 1.05rem; }
+    .message { max-width: 86%; display: flex; gap: 10px; align-items: flex-start; }
+    .message.user { align-self: flex-end; flex-direction: row-reverse; }
+    .avatar { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; background: var(--navy); color: white; font-size: .78rem; font-weight: 900; }
+    .user .avatar { background: var(--blue); }
+    .bubble { border: 1px solid var(--line); border-radius: 5px 16px 16px 16px; background: white; padding: 13px 15px; line-height: 1.5; box-shadow: 0 6px 18px rgba(16,42,86,.06); }
+    .user .bubble { border-color: #cbdcff; border-radius: 16px 5px 16px 16px; background: #eaf2ff; }
+    .bubble p { margin: 0; white-space: pre-wrap; }
+    .bubble h3 { margin: 0 0 8px; font-size: .9rem; }
+    .bubble ol { margin: 8px 0 0; padding-left: 21px; }
+    .bubble li + li { margin-top: 6px; }
+
+    .step-card { width: min(92%, 760px); align-self: flex-start; border: 1px solid var(--line); border-radius: 16px; background: white; overflow: hidden; box-shadow: 0 7px 20px rgba(16,42,86,.06); }
+    .step-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--line); background: #f7f9fc; }
+    .step-title { font-weight: 850; font-size: .86rem; }
+    .step-result { border-radius: 999px; background: #edf2f7; color: var(--muted); padding: 5px 9px; font-size: .72rem; font-weight: 850; }
+    .step-result.ok { background: #e8f9f0; color: var(--success); }
+    .step-result.fail { background: #fff0f2; color: var(--danger); }
+    .step-body { padding: 13px 14px; }
+    .step-action { color: var(--blue); font-size: .76rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
+    .step-description { margin: 6px 0 10px; line-height: 1.45; }
+    .arguments { margin: 0; border-radius: 10px; background: #10233f; color: #dce8f8; padding: 10px 12px; overflow-x: auto; font: .74rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+
+    .composer { border-top: 1px solid var(--line); padding: 17px 20px 19px; background: white; }
+    .controls { display: grid; grid-template-columns: 160px minmax(180px, 1fr) auto auto; gap: 10px; margin-bottom: 11px; }
+    select, input[type="text"] { min-height: 41px; min-width: 0; border: 1px solid #cbd7e5; border-radius: 10px; background: white; color: var(--ink); padding: 0 10px; }
+    .check { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: .8rem; white-space: nowrap; }
+    textarea { width: 100%; min-height: 92px; resize: vertical; border: 1px solid #c4d2e2; border-radius: 14px; color: var(--ink); padding: 13px 14px; line-height: 1.45; }
+    textarea::placeholder { color: #8d9caf; }
+    .send-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-top: 10px; }
+    .disclaimer { color: var(--muted); font-size: .72rem; }
+    .send-button { min-height: 44px; border: 0; border-radius: 12px; background: var(--blue); color: white; padding: 0 20px; font-weight: 850; box-shadow: 0 8px 18px rgba(36,107,253,.23); }
+    .send-button:disabled { cursor: not-allowed; opacity: .55; box-shadow: none; }
+
+    .side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+    .side-content { padding: 18px; }
+    .meta-list { display: grid; gap: 12px; }
+    .meta-item { border-bottom: 1px solid var(--line); padding-bottom: 11px; }
+    .meta-item:last-child { border-bottom: 0; padding-bottom: 0; }
+    .meta-label { display: block; margin-bottom: 4px; color: var(--muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+    .meta-value { display: block; overflow-wrap: anywhere; font-size: .86rem; font-weight: 720; }
+    .memory-link { color: var(--blue); text-decoration: none; }
+    .memory-link.disabled { color: var(--muted); pointer-events: none; }
+
+    .preview { aspect-ratio: 1.44; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: #e9eef5; color: var(--muted); text-align: center; font-size: .8rem; }
+    .preview img { width: 100%; height: 100%; object-fit: contain; background: white; }
+    .terminal { max-height: 250px; overflow: auto; border-radius: 12px; background: #0c1c32; color: #bcd0e7; padding: 12px; font: .72rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .terminal-line + .terminal-line { margin-top: 4px; }
+    .terminal-line.ok { color: #8de1b8; }
+    .terminal-line.error { color: #ff9bad; }
+
+    @media (max-width: 1050px) {
+      .workspace { grid-template-columns: 1fr; }
+      .side { display: grid; grid-template-columns: 1fr 1fr; }
+      .side .panel:last-child { grid-column: 1 / -1; }
+      .messages { max-height: 620px; }
+    }
+    @media (max-width: 680px) {
+      .topbar { align-items: flex-start; }
+      .brand span, .top-link { display: none; }
+      .workspace { width: min(100% - 18px, 1440px); margin-top: 10px; }
+      .side { display: flex; }
+      .controls { grid-template-columns: 1fr; }
+      .message, .step-card { max-width: 100%; width: 100%; }
+      .messages { padding: 15px; }
+      .send-row { align-items: stretch; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">AI</div>
+      <div><strong>FlowDesk Agent Console</strong><span>Planificación, ejecución y auditoría en tiempo real</span></div>
+    </div>
+    <div class="top-actions">
+      <a class="top-link" href="/target" target="_blank" rel="noopener">Abrir GUI objetivo</a>
+      <button class="new-session" id="newSession" type="button">Nueva sesión</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="panel chat-panel">
+      <div class="panel-head">
+        <div><h1>Chat con el agente</h1><p>Describe la meta, no la secuencia de clics.</p></div>
+        <div class="status" id="status">Listo</div>
+      </div>
+      <div class="messages" id="messages" aria-live="polite">
+        <div class="empty-chat" id="emptyChat">
+          <div class="symbol" aria-hidden="true">◇</div>
+          <strong>Indica qué resultado quieres obtener</strong>
+          El agente observará la GUI, te confirmará lo entendido, presentará su plan y ejecutará una acción por paso.
+        </div>
+      </div>
+      <form class="composer" id="composer">
+        <div class="controls">
+          <select id="mode" aria-label="Modo de observación">
+            <option value="dom">Solo DOM semántico</option>
+            <option value="screenshot">Solo screenshot</option>
+            <option value="hybrid" selected>DOM + screenshot</option>
+          </select>
+          <input id="model" type="text" value="gpt-5.6-luna" aria-label="Modelo">
+          <label class="check"><input id="headless" type="checkbox"> Navegador oculto</label>
+          <label class="check"><input id="slowMode" type="checkbox" checked> Pausa visual</label>
+        </div>
+        <textarea id="goal" required maxlength="2000" placeholder="Ejemplo: Registra una solicitud de acceso temporal para Ana Torres..."></textarea>
+        <div class="send-row">
+          <span class="disclaimer">Se muestran justificaciones resumidas y auditables, no la cadena de pensamiento privada del modelo.</span>
+          <button class="send-button" id="sendButton" type="submit">Ejecutar meta</button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <div class="panel-head"><div><h2>Sesión</h2><p>Identidad y archivos de supervisión</p></div></div>
+        <div class="side-content meta-list">
+          <div class="meta-item"><span class="meta-label">Session ID</span><span class="meta-value" id="sessionId">Sin iniciar</span></div>
+          <div class="meta-item"><span class="meta-label">Modo</span><span class="meta-value" id="sessionMode">Híbrido</span></div>
+          <div class="meta-item"><span class="meta-label">Progreso</span><span class="meta-value" id="progress">0 de 30 pasos</span></div>
+          <div class="meta-item"><span class="meta-label">Memoria auditable</span><a class="meta-value memory-link disabled" id="memoryLink" href="#">memory.json</a></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><h2>Última observación</h2><p>Las capturas se guardan en todos los modos</p></div></div>
+        <div class="side-content"><div class="preview" id="preview">Todavía no hay screenshots</div></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><h2>Salida de ejecución</h2><p>Equivalente a los mensajes del terminal</p></div></div>
+        <div class="side-content"><div class="terminal" id="terminal"><div class="terminal-line">Esperando una sesión...</div></div></div>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    const messages = document.getElementById('messages')
+    const emptyChat = document.getElementById('emptyChat')
+    const composer = document.getElementById('composer')
+    const goal = document.getElementById('goal')
+    const mode = document.getElementById('mode')
+    const model = document.getElementById('model')
+    const headless = document.getElementById('headless')
+    const slowMode = document.getElementById('slowMode')
+    const sendButton = document.getElementById('sendButton')
+    const status = document.getElementById('status')
+    const sessionId = document.getElementById('sessionId')
+    const sessionMode = document.getElementById('sessionMode')
+    const progress = document.getElementById('progress')
+    const memoryLink = document.getElementById('memoryLink')
+    const preview = document.getElementById('preview')
+    const terminal = document.getElementById('terminal')
+    const stepCards = new Map()
+    let eventSource = null
+    let running = false
+
+    const actionNames = {
+      click_element: 'Clic semántico',
+      fill_element: 'Completar campo',
+      select_option: 'Seleccionar opción',
+      set_checked: 'Cambiar selección',
+      click_at: 'Clic por coordenadas',
+      type_text: 'Escribir texto',
+      press_key: 'Presionar tecla',
+      wait: 'Esperar',
+      finish: 'Verificar objetivo'
+    }
+
+    const setStatus = (text, className = '') => {
+      status.textContent = text
+      status.className = `status ${className}`.trim()
+    }
+
+    const removeEmpty = () => {
+      if (emptyChat?.isConnected) emptyChat.remove()
+    }
+
+    const addMessage = (role, text) => {
+      removeEmpty()
+      const article = document.createElement('article')
+      article.className = `message ${role}`
+      const avatar = document.createElement('div')
+      avatar.className = 'avatar'
+      avatar.textContent = role === 'user' ? 'Tú' : 'AI'
+      const bubble = document.createElement('div')
+      bubble.className = 'bubble'
+      const paragraph = document.createElement('p')
+      paragraph.textContent = text
+      bubble.appendChild(paragraph)
+      article.append(avatar, bubble)
+      messages.appendChild(article)
+      messages.scrollTop = messages.scrollHeight
+      return bubble
+    }
+
+    const addPlan = event => {
+      const bubble = addMessage('assistant', event.understanding)
+      const title = document.createElement('h3')
+      title.textContent = 'Plan propuesto'
+      const list = document.createElement('ol')
+      event.items.forEach(item => {
+        const entry = document.createElement('li')
+        entry.textContent = item
+        list.appendChild(entry)
+      })
+      bubble.append(title, list)
+    }
+
+    const addStep = event => {
+      removeEmpty()
+      const card = document.createElement('article')
+      card.className = 'step-card'
+      const head = document.createElement('div')
+      head.className = 'step-head'
+      const title = document.createElement('span')
+      title.className = 'step-title'
+      title.textContent = `Paso ${String(event.step).padStart(2, '0')}`
+      const result = document.createElement('span')
+      result.className = 'step-result'
+      result.textContent = 'Ejecutando'
+      const body = document.createElement('div')
+      body.className = 'step-body'
+      const action = document.createElement('div')
+      action.className = 'step-action'
+      action.textContent = actionNames[event.action] || event.action
+      const description = document.createElement('p')
+      description.className = 'step-description'
+      description.textContent = event.description || 'Sin descripción'
+      const argumentsBlock = document.createElement('pre')
+      argumentsBlock.className = 'arguments'
+      argumentsBlock.textContent = JSON.stringify(event.arguments, null, 2)
+      head.append(title, result)
+      body.append(action, description, argumentsBlock)
+      card.append(head, body)
+      messages.appendChild(card)
+      stepCards.set(event.step, result)
+      progress.textContent = `${event.step} de 30 pasos`
+      messages.scrollTop = messages.scrollHeight
+      addTerminal(`Paso ${String(event.step).padStart(2, '0')} | ${event.action} | ${event.description}`)
+    }
+
+    const finishStep = event => {
+      const result = stepCards.get(event.step)
+      if (result) {
+        result.textContent = event.ok ? 'Correcto' : 'Falló'
+        result.className = `step-result ${event.ok ? 'ok' : 'fail'}`
+      }
+      addTerminal(`Resultado ${String(event.step).padStart(2, '0')} | ${event.ok ? 'OK' : 'ERROR'}`, event.ok ? 'ok' : 'error')
+    }
+
+    const addTerminal = (text, className = '') => {
+      if (terminal.children.length === 1 && terminal.textContent.includes('Esperando')) terminal.replaceChildren()
+      const line = document.createElement('div')
+      line.className = `terminal-line ${className}`.trim()
+      line.textContent = text
+      terminal.appendChild(line)
+      terminal.scrollTop = terminal.scrollHeight
+    }
+
+    const showScreenshot = url => {
+      const image = new Image()
+      image.alt = 'Última observación de la GUI objetivo'
+      image.src = `${url}?t=${Date.now()}`
+      preview.replaceChildren(image)
+    }
+
+    const setRunning = value => {
+      running = value
+      sendButton.disabled = value
+      goal.disabled = value
+      mode.disabled = value
+      model.disabled = value
+      headless.disabled = value
+      slowMode.disabled = value
+    }
+
+    const handleEvent = event => {
+      if (event.type === 'session_started') {
+        setStatus('Ejecutando', 'running')
+        addMessage('assistant', event.message)
+        addTerminal(`Sesión iniciada | máximo ${event.max_steps} pasos`)
+      }
+      if (event.type === 'observation' && event.screenshot_url) showScreenshot(event.screenshot_url)
+      if (event.type === 'plan') {
+        addPlan(event)
+        addTerminal(`Plan | ${event.understanding}`)
+        event.items.forEach((item, index) => addTerminal(`  ${index + 1}. ${item}`))
+      }
+      if (event.type === 'step_started') addStep(event)
+      if (event.type === 'step_result') finishStep(event)
+      if (event.type === 'session_completed') {
+        setStatus('Completado', 'completed')
+        addMessage('assistant', `Meta completada y verificada. ${event.summary}`)
+        addTerminal(`COMPLETADO | ${event.summary}`, 'ok')
+        setRunning(false)
+        eventSource?.close()
+      }
+      if (event.type === 'session_error') {
+        setStatus('Error', 'error')
+        addMessage('assistant', `No pude completar la meta: ${event.error}`)
+        addTerminal(`ERROR | ${event.error}`, 'error')
+        setRunning(false)
+        eventSource?.close()
+      }
+    }
+
+    composer.addEventListener('submit', async event => {
+      event.preventDefault()
+      if (running || !goal.value.trim()) return
+      addMessage('user', goal.value.trim())
+      setRunning(true)
+      setStatus('Iniciando', 'running')
+      sessionMode.textContent = mode.options[mode.selectedIndex].text
+      progress.textContent = '0 de 30 pasos'
+      terminal.replaceChildren()
+      addTerminal('Creando sesión...')
+      try {
+        const response = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            goal: goal.value.trim(),
+            mode: mode.value,
+            model: model.value.trim(),
+            headless: headless.checked,
+            delay: slowMode.checked ? 180 : 0,
+            max_steps: 30
+          })
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.detail || 'No se pudo iniciar la sesión')
+        sessionId.textContent = data.session_id
+        memoryLink.href = data.memory_url
+        memoryLink.classList.remove('disabled')
+        eventSource = new EventSource(data.events_url)
+        eventSource.onmessage = message => handleEvent(JSON.parse(message.data))
+        eventSource.onerror = () => {
+          if (running) addTerminal('Reconectando el canal de eventos...')
+        }
+      } catch (error) {
+        setStatus('Error', 'error')
+        addMessage('assistant', error.message)
+        addTerminal(`ERROR | ${error.message}`, 'error')
+        setRunning(false)
+      }
+    })
+
+    document.getElementById('newSession').addEventListener('click', () => {
+      if (running && !window.confirm('Hay una sesión en ejecución. ¿Deseas limpiar solamente esta vista?')) return
+      eventSource?.close()
+      window.location.reload()
+    })
+
+    fetch('/api/health')
+      .then(response => response.json())
+      .then(data => { goal.value = data.default_goal })
+      .catch(() => {})
+  </script>
+</body>
+</html>
